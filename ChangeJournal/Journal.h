@@ -5,6 +5,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <functional>
 #include <vector>
 #include "..\Utils\Buffer.h"
 #include "..\Utils\Marshaller.h"
@@ -27,6 +28,7 @@ public:
 	virtual int createJournal(DWORDLONG&, DWORDLONG&) = 0;
 	virtual int resetJournal() = 0;
 	virtual int getError() = 0;
+	virtual int map(std::function<void(PUSN_RECORD, PVOID)>&, PVOID) = 0;
 };
 
 class Journal : IJournal {
@@ -43,6 +45,8 @@ public:
 	virtual int createJournal(DWORDLONG& maxSize, DWORDLONG& allocDelta);
 	virtual int resetJournal();
 	virtual int getError();
+	virtual int map(std::function<void(PUSN_RECORD, PVOID)>& func, PVOID optArg=NULL);
+	virtual int getRecords(Buffer& buff, USN& next, PDWORD bytesRead);
 private:
 	HANDLE vol;
 	PUSN_JOURNAL_DATA data;
@@ -54,6 +58,9 @@ private:
 };
 
 namespace ChangeJournal {
+
+	
+
 	int walkRecordBuffer(Buffer& buf, IJournal* journ, IMarshaller* marsh, std::vector<std::wstring>& output, USN* next, DWORD bytesToWalk);
 	int getRecords(IJournal* journal, Buffer& buf, USN& next, PDWORD bytesRead);
 	int enumerateRecords(IJournal* journal, IMarshaller* marshaller, std::vector<std::wstring>& output);

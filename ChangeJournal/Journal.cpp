@@ -230,6 +230,83 @@ int Journal::resetJournal()
 	return status;
 }
 
+
+/**
+* Invokes the provided function on each USN_RECORD in the set, passing an optional argument
+* which is set to NULL if non is provided.
+*/
+int Journal::map(std::function<void(PUSN_RECORD, PVOID)>& func, PVOID optArg)
+{
+	int status = ERROR_SUCCESS;
+	USN nextUsn = 0;
+	PUSN_RECORD current = NULL;
+	DWORD bytesToWalk;
+	Buffer buf(QUERY_BUFFER_SIZE);
+
+	const PBYTE buffer = buf.getBuffer();
+	SIZE_T len = buf.size();
+
+	if (NULL == buffer)
+		return ERROR_OUTOFMEMORY;
+
+	while (ERROR_SUCCESS == (status = getRecords(buf, nextUsn, &bytesToWalk))) {
+
+		// get the next USN, which is prepended to the retrieved buffer
+		nextUsn = *(USN*)buffer;
+		// advance to the first actual record
+		current = (PUSN_RECORD)((PBYTE)buffer + sizeof(USN));
+
+		while ((PBYTE)current < (PBYTE)buffer + bytesToWalk) {
+			try {
+				func(current, optArg);
+			}
+			catch (...) {
+				return GetLastError();
+			}
+
+			current = (PUSN_RECORD)((PBYTE)current + current->RecordLength);
+		}
+	}
+
+	if (ERROR_NO_MORE_ITEMS == status)
+		status = ERROR_SUCCESS;
+
+	return status;
+}
+
+
+int Journal::getRecords(Buffer& buff, USN& next, PDWORD bytesRead)
+{
+	int status = ERROR_SUCCESS;
+	DWORD bytes;
+	READ_USN_JOURNAL_DATA_V0 readData = { 0 };
+
+	const PBYTE pt = buff.getBuffer();
+	SIZE_T len = buff.size();
+
+	if (NULL == bytesRead || NULL == pt || 0 == len)
+		return ERROR_INVALID_PARAMETER;
+
+	if (INVALID_HANDLE_VALUE == vol || NULL == data)
+		return ERROR_INVALID_HANDLE;
+
+
+	// query all the things
+	readData.ReasonMask = (DWORD)-1;
+	readData.UsnJournalID = data->UsnJournalID;
+	readData.StartUsn = next;
+
+	if (!DeviceIoControl(vol, FSCTL_READ_USN_JOURNAL, &readData, sizeof(readData), pt, len, &bytes, NULL)) {
+		status = GetLastError();
+	}
+
+	*bytesRead = bytes;
+	if (bytes <= sizeof(USN))
+		status = ERROR_NO_MORE_ITEMS;
+
+	return status;
+}
+
 const HANDLE Journal::getHandle()
 {
 	return const_cast<const HANDLE>(vol);

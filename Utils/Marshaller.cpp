@@ -19,7 +19,7 @@ int JsonMarshaller::marshallULong(PWCHAR key, ULONG in, std::wstring& output)
 {
 	WCHAR buf[MAX_PATH + 1] = { 0 };
 	int status = ERROR_SUCCESS;
-	PWCHAR fmt = L"\"%s\" : \"%lu\"";
+	PWCHAR fmt = L"\"%s\" : %lu";
 
 	if (NULL == key || (4 + wcslen(key) + wcslen(fmt)) > MAX_PATH)
 		return ERROR_INVALID_PARAMETER;
@@ -36,7 +36,7 @@ int JsonMarshaller::marshallLong(PWCHAR key, LONG in, std::wstring& output)
 {
 	WCHAR buf[MAX_PATH + 1] = { 0 };
 	int status = ERROR_SUCCESS;
-	PWCHAR fmt = L"\"%s\" : \"%ld\"";
+	PWCHAR fmt = L"\"%s\" : %ld";
 
 	if (NULL == key || (4 + wcslen(key) + wcslen(fmt)) > MAX_PATH)
 		return ERROR_INVALID_PARAMETER;

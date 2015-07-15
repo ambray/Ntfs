@@ -1,6 +1,7 @@
 #include <gmock\gmock.h>
 #include "..\ChangeJournal\Journal.h"
 #include <string>
+#include <fstream>
 #include "JournalMock.h"
 
 #define ERROR_CANT_FIND		2
@@ -13,6 +14,37 @@ typedef struct {
 	USN_RECORD_V3 record;
 	WCHAR moreStuff[10];
 } USN_TEST_RECORD_V3, *PUSN_TEST_RECORD_V3;
+
+
+static bool generateNoise()
+{
+	bool good = true;
+	std::wfstream f;
+
+	srand(GetTickCount());
+	auto iterations = rand();
+
+
+	// Create some stuff to ensure we have enumerable records
+	f.open(L"test.txt", std::ios::out | std::ios::trunc);
+
+	if (!f.is_open())
+		return false;
+
+	std::wstring tmp = L"";
+	for (auto i = 0; i < iterations; ++i) {
+		tmp += (WCHAR)rand();
+	}
+
+	f << L"aklsdfjklajsdfkladjsklfjkldjsf" << std::endl;
+	f << L"bkajbsfjklhajkdhsfkjahsdjkfhajkls" << std::endl;
+
+	f.close();
+
+	DeleteFileA("test.txt");
+
+	return good;
+}
 
 TEST(JournalTest, BadVolname)
 {
@@ -116,12 +148,36 @@ TEST(JournalTest, SetNameTest)
 	ASSERT_EQ(NULL, (SIZE_T)j.getData());
 }
 
+// This test is a bit hokey, but it'll clean things up for now
+TEST(JournalTest, ResetJournalTest)
+{
+	Journal j(std::wstring(L"C:"));
+
+	ASSERT_EQ(ERROR_SUCCESS, j.resetJournal());
+}
+
 TEST(JournalTest, TestBufferEnum)
 {
 	JsonMarshaller jm;
 	Journal j(std::wstring(L"C:"));
 	std::vector<std::wstring> list;
 
+	ASSERT_TRUE(generateNoise());
+
 	ASSERT_EQ(ERROR_SUCCESS, ChangeJournal::enumerateRecords((IJournal*)&j, (IMarshaller*)&jm, list));
 	ASSERT_NE(0, list.size());
 }
+
+
+TEST(JournalTest, MapFunctionTest)
+{
+	Journal j(std::wstring(L"C:"));
+
+	std::function<void(PUSN_RECORD, PVOID)> fn = ([&](PUSN_RECORD j, PVOID) { ASSERT_TRUE(((j->MajorVersion == 2 || j->MajorVersion == 3) ? true : false)); });
+
+	j.resetJournal();
+	generateNoise();
+
+	ASSERT_EQ(ERROR_SUCCESS, j.map(fn));
+}
+
