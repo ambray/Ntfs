@@ -103,3 +103,25 @@ TEST(BufferTest, TestCompare)
 	memset(buf, 0x41, 1024);
 	ASSERT_NE(ERROR_SUCCESS, b.compare(buf, 1024));
 }
+
+
+TEST(BufferTest, TestChangeType)
+{
+	BYTE buf[1024];
+	Buffer b(1024, BufferType::TypeHeap);
+
+	memset(buf, 0x41, 1024);
+	
+	ASSERT_EQ(ERROR_SUCCESS, b.copyTo(buf, 1024));
+	const PBYTE b2 = b.getBuffer();
+
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, b2, 1024));
+
+	ASSERT_EQ(ERROR_SUCCESS, b.setType(BufferType::TypeVirtual));
+	ASSERT_EQ(ERROR_SUCCESS, b.copyTo(buf, 1024));
+
+	const PBYTE b3 = b.getBuffer();
+
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, b3, 1024));
+
+}

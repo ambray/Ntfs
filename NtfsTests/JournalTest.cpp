@@ -172,7 +172,7 @@ TEST(JournalTest, TestBufferEnum)
 TEST(JournalTest, MapFunctionTest)
 {
 	Journal j(std::wstring(L"C:"));
-
+	// Perhaps not the greatest validation, but it at least makes it unlikely we are looking at pure garbage
 	std::function<void(PUSN_RECORD, PVOID)> fn = ([&](PUSN_RECORD j, PVOID) { ASSERT_TRUE(((j->MajorVersion == 2 || j->MajorVersion == 3) ? true : false)); });
 
 	j.resetJournal();

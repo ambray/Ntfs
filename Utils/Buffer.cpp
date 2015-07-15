@@ -1,20 +1,26 @@
 #include "Buffer.h"
 
 
-Buffer::Buffer(SIZE_T size) : error(ERROR_SUCCESS), currentSize(size), buffer(NULL) 
+Buffer::Buffer(SIZE_T size, BufferType bt) : error(ERROR_SUCCESS), currentSize(size), buffer(NULL), btype(bt), hHeap(INVALID_HANDLE_VALUE)
 {
+	if (BufferType::TypeHeap == btype)
+		hHeap = GetProcessHeap();
+
 	internalAllocate(size);
 }
 
 /**
 * Allocate and copy in the provided buffer, assuming all allocations work properly.
 */
-Buffer::Buffer(PBYTE buf, SIZE_T len) : error(ERROR_SUCCESS), currentSize(len), buffer(NULL)
+Buffer::Buffer(PBYTE buf, SIZE_T len, BufferType bt) : error(ERROR_SUCCESS), currentSize(len), buffer(NULL), btype(bt), hHeap(INVALID_HANDLE_VALUE)
 {
 	if (NULL == buf || 0 == len) {
 		error = ERROR_INVALID_PARAMETER;
 		return;
 	}
+
+	if (BufferType::TypeHeap == btype)
+		hHeap = GetProcessHeap();
 
 	int status = internalAllocate(len);
 	if (ERROR_SUCCESS == status)
@@ -139,10 +145,18 @@ int Buffer::internalAllocate(SIZE_T size)
 	if (NULL != buffer)
 		internalFree(buffer);
 
-	if (NULL == (buffer = (PBYTE)VirtualAlloc(NULL, size, MEM_COMMIT, PAGE_READWRITE))) {
-		error = status = GetLastError();
+	if (BufferType::TypeVirtual == btype) {
+		if (NULL == (buffer = (PBYTE)VirtualAlloc(NULL, size, MEM_COMMIT, PAGE_READWRITE))) {
+			error = status = GetLastError();
+		}
+	}
+	else if (BufferType::TypeHeap == btype) {
+		if (NULL == (buffer = (PBYTE)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, size))) {
+			error = status = GetLastError();
+		}
 	}
 
+	currentSize = size;
 	if (NULL == buffer)
 		currentSize = 0;
 
@@ -158,8 +172,14 @@ int Buffer::internalFree(PVOID buffer)
 		return status;
 	}
 
-	if (!VirtualFree(buffer, 0, MEM_RELEASE))
-		error = status = GetLastError();
+	if (BufferType::TypeVirtual == btype) {
+		if (!VirtualFree(buffer, 0, MEM_RELEASE))
+			error = status = GetLastError();
+	}
+	else if (BufferType::TypeHeap == btype) {
+		if (!HeapFree(hHeap, 0, buffer))
+			error = status = GetLastError();
+	}
 
 	if (ERROR_SUCCESS == status)
 		currentSize = 0;
@@ -167,3 +187,31 @@ int Buffer::internalFree(PVOID buffer)
 	return status;
 }
 
+
+const BufferType Buffer::getCurrentType()
+{
+	return const_cast<const BufferType>(btype);
+}
+
+int Buffer::setType(BufferType bt)
+{
+	int status = ERROR_SUCCESS;
+	SIZE_T oldSize = currentSize;
+
+	if (bt == btype)
+		return ERROR_SUCCESS;
+
+	if (bt == BufferType::TypeHeap)
+		hHeap = GetProcessHeap();
+
+	if (NULL != buffer) {
+		if (ERROR_SUCCESS != (status = internalFree(buffer))) {
+			return status;
+		}
+	}
+
+	btype = bt;
+	status = internalAllocate(oldSize);
+
+	return status;
+}

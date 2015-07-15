@@ -26,5 +26,8 @@
     <ClInclude Include="Journal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ntfs_defs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
