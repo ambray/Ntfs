@@ -33,7 +33,7 @@ int Journal::setHandle(HANDLE vh)
 	int status = ERROR_SUCCESS;
 	HANDLE tmp;
 
-	if (INVALID_HANDLE_VALUE == vh)
+	if (INVALID_HANDLE_VALUE == vh || NULL == vh)
 		return ERROR_INVALID_HANDLE;
 
 	if (!DuplicateHandle(GetCurrentProcess(), vh, GetCurrentProcess(), &tmp, 0, FALSE, DUPLICATE_SAME_ACCESS)) {

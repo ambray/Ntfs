@@ -82,6 +82,7 @@
     <ClCompile Include="JournalTest.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MarshallerTest.cpp" />
+    <ClCompile Include="VolTests.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="JournalMock.h" />
