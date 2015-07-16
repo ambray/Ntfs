@@ -75,10 +75,12 @@
   <ItemGroup>
     <ClCompile Include="Journal.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="NtfsClasses.cpp" />
     <ClCompile Include="Volume.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Journal.h" />
+    <ClInclude Include="NtfsClasses.h" />
     <ClInclude Include="ntfs_defs.h" />
     <ClInclude Include="Volume.h" />
   </ItemGroup>

@@ -38,3 +38,27 @@ TEST(VolumeTest, TestVolInfo)
 	ASSERT_EQ(v1.maxComponentLength, v2.maxComponentLength);
 
 }
+
+
+TEST(VolumeTest, TestVolData)
+{
+	PNTFS_VOLUME_DATA_BUFFER volData = NULL;
+	std::wstring volname = L"C:";
+	Volume v(volname);
+	DWORD bytes;
+	DWORD size = sizeof(NTFS_VOLUME_DATA_BUFFER) + sizeof(NTFS_EXTENDED_VOLUME_DATA);
+	Buffer b(size);
+
+	const HANDLE tmp = v.getHandle();
+	ASSERT_NE(INVALID_HANDLE_VALUE, tmp);
+	volData = (PNTFS_VOLUME_DATA_BUFFER)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+	ASSERT_NE(NULL, (SIZE_T)volData);
+
+	ASSERT_TRUE(DeviceIoControl(tmp, FSCTL_GET_NTFS_VOLUME_DATA, NULL, 0, volData, size, &bytes, NULL));
+
+	ASSERT_EQ(ERROR_SUCCESS, v.getVolData(b));
+	const PBYTE buf = b.getBuffer();
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(volData, (PNTFS_VOLUME_DATA_BUFFER)buf, size));
+	HeapFree(GetProcessHeap(), 0, volData);
+
+}

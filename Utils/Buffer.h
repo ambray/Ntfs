@@ -41,6 +41,24 @@ typedef enum {
 	TypeHeap,
 } BufferType;
 
+
+/**
+* Structure representing buffer attributes.
+* * Some notes for use with setAttr:
+*	-> setting BufferType to a value other than either 0 or
+*	   the current type will result in a changeType() (which implies reallocating the buffer)
+*	-> The union members are associated with different BufferTypes, e.g., you will not get a valid result in memProtect with
+*	   getAttr if your current Buffer is TypeHeap.
+*
+*/
+typedef struct {
+	BufferType type;
+	union {
+		HANDLE	   hHeap;
+		DWORD	   memProtect;
+	} u;
+} BUFFER_ATTRIBS, *PBUFFER_ATTRIBS;
+
 class IBuffer {
 public:
 	IBuffer() {};
@@ -55,6 +73,10 @@ public:
 	virtual int compare(PVOID, SIZE_T) = 0;
 	virtual const BufferType getCurrentType() = 0;
 	virtual int setType(BufferType) = 0;
+	virtual int setAttribs(PBUFFER_ATTRIBS attribs) = 0;
+	virtual const BUFFER_ATTRIBS& getAttribs() = 0;
+	virtual int copyToOffset(PVOID src, SIZE_T offset, SIZE_T len) = 0;
+	virtual int copyFromOffset(PVOID dst, SIZE_T offset, SIZE_T len) = 0;
 };
 
 
@@ -73,11 +95,14 @@ public:
 	virtual int compare(PVOID buffer, SIZE_T len);
 	virtual const BufferType getCurrentType();
 	virtual int setType(BufferType nt);
+	virtual int setAttribs(PBUFFER_ATTRIBS attribs);
+	virtual const BUFFER_ATTRIBS& getAttribs();
+	virtual int copyToOffset(PVOID src, SIZE_T offset, SIZE_T len);
+	virtual int copyFromOffset(PVOID dst, SIZE_T offset, SIZE_T len);
 private:
 	PBYTE buffer;
 	SIZE_T currentSize;
-	BufferType btype;
-	HANDLE hHeap;
+	BUFFER_ATTRIBS bAttrs;
 	int error;
 
 	int internalAllocate(SIZE_T size);

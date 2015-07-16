@@ -1,10 +1,17 @@
 #include "Buffer.h"
 
 
-Buffer::Buffer(SIZE_T size, BufferType bt) : error(ERROR_SUCCESS), currentSize(size), buffer(NULL), btype(bt), hHeap(INVALID_HANDLE_VALUE)
+Buffer::Buffer(SIZE_T size, BufferType bt) : error(ERROR_SUCCESS), currentSize(size), buffer(NULL)
 {
-	if (BufferType::TypeHeap == btype)
-		hHeap = GetProcessHeap();
+	ZeroMemory(&bAttrs, sizeof(bAttrs));
+
+	bAttrs.type = bt;
+
+	if (BufferType::TypeVirtual == bAttrs.type)
+		bAttrs.u.memProtect = PAGE_READWRITE;
+
+	else if (BufferType::TypeHeap == bAttrs.type)
+		bAttrs.u.hHeap = GetProcessHeap();
 
 	internalAllocate(size);
 }
@@ -12,15 +19,22 @@ Buffer::Buffer(SIZE_T size, BufferType bt) : error(ERROR_SUCCESS), currentSize(s
 /**
 * Allocate and copy in the provided buffer, assuming all allocations work properly.
 */
-Buffer::Buffer(PBYTE buf, SIZE_T len, BufferType bt) : error(ERROR_SUCCESS), currentSize(len), buffer(NULL), btype(bt), hHeap(INVALID_HANDLE_VALUE)
+Buffer::Buffer(PBYTE buf, SIZE_T len, BufferType bt) : error(ERROR_SUCCESS), currentSize(len), buffer(NULL)
 {
 	if (NULL == buf || 0 == len) {
 		error = ERROR_INVALID_PARAMETER;
 		return;
 	}
 
-	if (BufferType::TypeHeap == btype)
-		hHeap = GetProcessHeap();
+	ZeroMemory(&bAttrs, sizeof(bAttrs));
+
+	bAttrs.type = bt;
+
+	if (BufferType::TypeVirtual == bAttrs.type)
+		bAttrs.u.memProtect = PAGE_READWRITE;
+	else if (BufferType::TypeHeap == bAttrs.type)
+		bAttrs.u.hHeap = GetProcessHeap();
+
 
 	int status = internalAllocate(len);
 	if (ERROR_SUCCESS == status)
@@ -56,13 +70,15 @@ int Buffer::resize(SIZE_T nsize)
 {
 	int status = ERROR_SUCCESS;
 
+	if (currentSize >= nsize)
+		return status;
+
+	
+	if (ERROR_SUCCESS != (status = internalFree(buffer)))
+		return status;
+
 	status = internalAllocate(nsize);
 	clear();
-
-	if (ERROR_SUCCESS == status)
-		currentSize = nsize;
-	else
-		error = status;
 
 	return status;
 }
@@ -137,21 +153,116 @@ int Buffer::compare(PVOID buf, SIZE_T len)
 	return status;
 }
 
+/**
+* Copies information from the stored buffer into "dst" from offset "offset".
+*/
+int Buffer::copyFromOffset(PVOID dst, SIZE_T offset, SIZE_T len)
+{
+	int status = ERROR_SUCCESS;
+
+	if (NULL == dst || 0 == len)
+		return ERROR_INVALID_PARAMETER;
+
+	if ((offset + len) > currentSize)
+		return ERROR_BUFFER_OVERFLOW;
+
+	RtlCopyMemory(dst, ((PBYTE)buffer + offset), len);
+
+	return status;
+}
+
+
+/**
+* Copies information from "src" into the stored buffer at "offset"
+*/
+int Buffer::copyToOffset(PVOID src, SIZE_T offset, SIZE_T len)
+{
+	int status = ERROR_SUCCESS;
+
+	if (NULL == src || 0 == len)
+		return ERROR_INVALID_PARAMETER;
+
+	if ((offset + len) > currentSize)
+		return ERROR_BUFFER_OVERFLOW;
+
+	RtlCopyMemory(((PBYTE)buffer + offset), src, len);
+
+	return status;
+}
+
+/**
+* Sets the buffer attributes (memory protections if virtualalloc'd,
+* the current HANDLE if heap allocated, )
+*/
+int Buffer::setAttribs(PBUFFER_ATTRIBS attribs)
+{
+	int status = ERROR_SUCCESS;
+	SIZE_T oldSize = currentSize;
+
+	if (NULL == attribs)
+		return ERROR_INVALID_PARAMETER;
+
+	if (BufferType::TypeHeap != attribs->type && BufferType::TypeVirtual != attribs->type)
+		return ERROR_INVALID_PARAMETER;
+
+	if (attribs->type != bAttrs.type) {
+		if (ERROR_SUCCESS != (status = internalFree(buffer))) {
+			error = status;
+			return status;
+		}
+
+		bAttrs.type = attribs->type;
+
+		if (BufferType::TypeHeap == attribs->type) {
+			bAttrs.u.hHeap = attribs->u.hHeap;
+		}
+		else if (BufferType::TypeVirtual == attribs->type) {
+			bAttrs.u.memProtect = attribs->u.memProtect;
+		}
+
+		if (ERROR_SUCCESS != (status = internalAllocate(oldSize))) {
+			return status;
+		}
+	}
+	else {
+		// This is an important case to handle; we need to free our
+		// current buffer before switching handles
+		if (BufferType::TypeHeap == bAttrs.type) {
+			oldSize = currentSize;
+			if (ERROR_SUCCESS != (status = internalFree(buffer)))
+				return status;
+
+			bAttrs.u.hHeap = attribs->u.hHeap;
+			status = internalAllocate(oldSize);
+		}
+		else if (BufferType::TypeVirtual == bAttrs.type) {
+			if (!VirtualProtect(buffer, currentSize, attribs->u.memProtect, &oldSize)) {
+				status = GetLastError();
+			}
+		}
+	}
+
+	return status;
+}
+
+
+
+const BUFFER_ATTRIBS& Buffer::getAttribs()
+{
+	return bAttrs;
+}
 
 int Buffer::internalAllocate(SIZE_T size)
 {
 	int status = ERROR_SUCCESS;
 
-	if (NULL != buffer)
-		internalFree(buffer);
-
-	if (BufferType::TypeVirtual == btype) {
-		if (NULL == (buffer = (PBYTE)VirtualAlloc(NULL, size, MEM_COMMIT, PAGE_READWRITE))) {
+	if (BufferType::TypeVirtual == bAttrs.type) {
+		if (NULL == (buffer = (PBYTE)VirtualAlloc(NULL, size, MEM_COMMIT, bAttrs.u.memProtect))) {
 			error = status = GetLastError();
 		}
 	}
-	else if (BufferType::TypeHeap == btype) {
-		if (NULL == (buffer = (PBYTE)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, size))) {
+	else if (BufferType::TypeHeap == bAttrs.type) {
+		if (NULL == (buffer = (PBYTE)HeapAlloc(bAttrs.u.hHeap, HEAP_ZERO_MEMORY, size))) {
 			error = status = GetLastError();
 		}
 	}
@@ -172,17 +283,19 @@ int Buffer::internalFree(PVOID buffer)
 		return status;
 	}
 
-	if (BufferType::TypeVirtual == btype) {
+	if (BufferType::TypeVirtual == bAttrs.type) {
 		if (!VirtualFree(buffer, 0, MEM_RELEASE))
 			error = status = GetLastError();
 	}
-	else if (BufferType::TypeHeap == btype) {
-		if (!HeapFree(hHeap, 0, buffer))
+	else if (BufferType::TypeHeap == bAttrs.type) {
+		if (!HeapFree(bAttrs.u.hHeap, 0, buffer))
 			error = status = GetLastError();
 	}
 
-	if (ERROR_SUCCESS == status)
+	if (ERROR_SUCCESS == status) {
 		currentSize = 0;
+		buffer = NULL;
+	}
 
 	return status;
 }
@@ -190,7 +303,7 @@ int Buffer::internalFree(PVOID buffer)
 
 const BufferType Buffer::getCurrentType()
 {
-	return const_cast<const BufferType>(btype);
+	return const_cast<const BufferType>(bAttrs.type);
 }
 
 int Buffer::setType(BufferType bt)
@@ -198,11 +311,8 @@ int Buffer::setType(BufferType bt)
 	int status = ERROR_SUCCESS;
 	SIZE_T oldSize = currentSize;
 
-	if (bt == btype)
+	if (bt == bAttrs.type)
 		return ERROR_SUCCESS;
-
-	if (bt == BufferType::TypeHeap)
-		hHeap = GetProcessHeap();
 
 	if (NULL != buffer) {
 		if (ERROR_SUCCESS != (status = internalFree(buffer))) {
@@ -210,7 +320,14 @@ int Buffer::setType(BufferType bt)
 		}
 	}
 
-	btype = bt;
+	if (bt == BufferType::TypeHeap)
+		bAttrs.u.hHeap = GetProcessHeap();
+
+	if (bt == BufferType::TypeVirtual)
+		bAttrs.u.memProtect = PAGE_READWRITE;
+
+
+	bAttrs.type = bt;
 	status = internalAllocate(oldSize);
 
 	return status;

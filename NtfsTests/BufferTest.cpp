@@ -125,3 +125,64 @@ TEST(BufferTest, TestChangeType)
 	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, b3, 1024));
 
 }
+
+TEST(BufferTest, TestCopyOffsets)
+{
+	BYTE bufTest[1024] = { 0 };
+	BYTE buf1[1024];
+	BYTE buf2[1024];
+
+	Buffer b(2048);
+
+	memset(buf1, 0x41, 1024);
+	memset(buf2, 0x42, 1024);
+
+	ASSERT_NE(NULL, (SIZE_T)b.getBuffer());
+	ASSERT_EQ(ERROR_SUCCESS, b.copyToOffset(buf1, 0, 1024));
+	ASSERT_EQ(ERROR_SUCCESS, b.copyToOffset(buf2, 1024, 1024));
+
+	ASSERT_EQ(ERROR_SUCCESS, b.copyFromOffset(bufTest, 0, 1024));
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf1, bufTest, 1024));
+	
+	SecureZeroMemory(bufTest, 1024);
+
+	ASSERT_EQ(ERROR_SUCCESS, b.copyFromOffset(bufTest, 1024, 1024));
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf2, bufTest, 1024));
+
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, b.copyFromOffset(NULL, 1024, 1024));
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, b.copyToOffset(NULL, 1024, 1024));
+
+	ASSERT_EQ(ERROR_BUFFER_OVERFLOW, b.copyToOffset(buf1, 1026, 1024));
+	ASSERT_EQ(ERROR_BUFFER_OVERFLOW, b.copyFromOffset(buf1, 2000, 1024));
+}
+
+
+TEST(BufferTest, TestChangeAttribs)
+{
+	BUFFER_ATTRIBS attrs;
+	MEMORY_BASIC_INFORMATION binf = { 0 };
+
+	Buffer b(1024);
+
+
+	memset(&attrs, 0, sizeof(attrs));
+
+	attrs.type = BufferType::TypeHeap;
+	attrs.u.hHeap = GetProcessHeap();
+
+	ASSERT_EQ(ERROR_SUCCESS, b.setAttribs(&attrs));
+	ASSERT_EQ(1024, b.size());
+	ASSERT_NE(NULL, (SIZE_T)b.getBuffer());
+
+
+	attrs.type = BufferType::TypeVirtual;
+	attrs.u.memProtect = PAGE_EXECUTE_READWRITE;
+
+	ASSERT_EQ(ERROR_SUCCESS, b.setAttribs(&attrs));
+
+	const PBYTE buf = b.getBuffer();
+	ASSERT_NE(NULL, (SIZE_T)buf);
+	VirtualQuery(buf, &binf, b.size());
+
+	ASSERT_EQ(PAGE_EXECUTE_READWRITE, binf.AllocationProtect);
+}
