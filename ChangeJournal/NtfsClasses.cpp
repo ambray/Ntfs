@@ -1,6 +1,6 @@
 #include "NtfsClasses.h"
 
-MftRecord::MftRecord(PVOID) : rec(1) // just a placeholder for now
+MftRecord::MftRecord(PVOID) : rec(NULL)
 {}
 
 MftRecord::~MftRecord()

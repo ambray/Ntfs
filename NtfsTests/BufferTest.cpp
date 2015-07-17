@@ -65,6 +65,8 @@ TEST(BufferTest, TestCopyTo)
 	ASSERT_EQ(ERROR_INVALID_PARAMETER, b.copyTo(badbuf, 1024));
 	ASSERT_EQ(ERROR_SUCCESS, c.copyTo(buf, 2048));
 	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, c.getBuffer(), 2048));
+	ASSERT_EQ(ERROR_SUCCESS, c.resize(512));
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, c.getBuffer(), c.size()));
 
 }
 
@@ -159,6 +161,7 @@ TEST(BufferTest, TestCopyOffsets)
 
 TEST(BufferTest, TestChangeAttribs)
 {
+	BYTE buffer[1024];
 	BUFFER_ATTRIBS attrs;
 	MEMORY_BASIC_INFORMATION binf = { 0 };
 
@@ -185,4 +188,43 @@ TEST(BufferTest, TestChangeAttribs)
 	VirtualQuery(buf, &binf, b.size());
 
 	ASSERT_EQ(PAGE_EXECUTE_READWRITE, binf.AllocationProtect);
+
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, b.setAttribs(NULL));
+	attrs.type = BufferType::TypeInvalid;
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, b.setAttribs(&attrs));
+	ZeroMemory(&attrs, sizeof(attrs));
+
+	attrs.type = BufferType::TypeHeap;
+	attrs.u.hHeap = GetProcessHeap();
+
+	ASSERT_EQ(ERROR_SUCCESS, b.setAttribs(&attrs));
+	memset(buffer, 0x41, 1024);
+	b.copyTo(buffer, 1024);
+
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buffer, b.getBuffer(), 1024));
+}
+
+
+TEST(BufferTest, TestAlternateConstructor)
+{
+	BYTE buf[1024];
+	Buffer b(NULL, 1024);
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, b.getError());
+	ASSERT_EQ(NULL, (SIZE_T)b.getBuffer());
+	memset(buf, 0x41, 1024);
+
+	Buffer c(buf, 0);
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, c.getError());
+	ASSERT_EQ(NULL, (SIZE_T)c.getBuffer());
+
+	Buffer d(buf, 1024, BufferType::TypeHeap);
+	ASSERT_EQ(ERROR_SUCCESS, d.getError());
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, d.getBuffer(), 1024));
+
+	const BUFFER_ATTRIBS bufAttrs = d.getAttribs();
+
+	ASSERT_EQ(BufferType::TypeHeap, bufAttrs.type);
+	ASSERT_EQ(GetProcessHeap(), bufAttrs.u.hHeap);
+	ASSERT_EQ(bufAttrs.type, d.getCurrentType());
+	
 }

@@ -292,10 +292,8 @@ int Buffer::internalFree(PVOID buffer)
 			error = status = GetLastError();
 	}
 
-	if (ERROR_SUCCESS == status) {
-		currentSize = 0;
-		buffer = NULL;
-	}
+	currentSize = 0;
+	this->buffer = NULL;
 
 	return status;
 }

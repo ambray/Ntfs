@@ -81,3 +81,67 @@ TEST(ArgParserTest, TestStripDelims)
 	ASSERT_TRUE(ap.getAttribute(base));
 
 }
+
+TEST(ArgParserTest, GetAttribsTest)
+{
+	WCHAR* stuff[] = {
+		L"-s",
+		L"abcd",
+		L"-t",
+		L"/l",
+	};
+
+	int count = 4;
+
+	ArgParser ap(stuff, count);
+
+	const std::map<std::wstring, std::wstring>& ats = ap.getArgs();
+
+	auto tmp = ats.find(std::wstring(L"s"));
+	ASSERT_NE(tmp, ats.end());
+
+	ASSERT_EQ(ERROR_SUCCESS, tmp->second.compare(std::wstring(L"abcd")));
+	tmp = ats.find(std::wstring(L"t"));
+	ASSERT_NE(tmp, ats.end());
+
+	ASSERT_EQ(ERROR_SUCCESS, tmp->second.compare(std::wstring(L"enabled")));
+
+}
+
+
+TEST(ArgParserTest, AltGetAttribTest)
+{
+	std::wstring tmp;
+	WCHAR* stuff[] = {
+		L"-s",
+		L"abcd",
+		L"-t",
+		L"/l",
+	};
+
+	int count = 4;
+
+	ArgParser ap(stuff, count);
+
+	ASSERT_FALSE(ap.getAttribute(NULL));
+	ASSERT_TRUE(ap.getAttribute(L"s"));
+	ASSERT_TRUE(ap.getAttribute(L"/l"));
+	ASSERT_FALSE(ap.getAttribute(L"-/l"));
+	ASSERT_FALSE(ap.getAttribute(NULL, tmp));
+	ASSERT_TRUE(ap.getAttribute(L"-t", tmp));
+	ASSERT_EQ(ERROR_SUCCESS, tmp.compare(L"enabled"));
+	
+}
+
+
+TEST(ArgParserTest, TestArgParsing)
+{
+	ArgParser ap(NULL, 5);
+	PWCHAR s = L"-This";
+
+
+	ASSERT_FALSE(ap.getAttribute(NULL));
+	ASSERT_FALSE(ap.getAttribute(L"-s"));
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, ap.parseArgs(&s, 0));
+	ASSERT_EQ(ERROR_NO_MORE_ITEMS, ap.parseArgs(&s, 1));
+}

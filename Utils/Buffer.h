@@ -39,6 +39,7 @@ private:
 typedef enum {
 	TypeVirtual,
 	TypeHeap,
+	TypeInvalid, // strictly for unit test validation
 } BufferType;
 
 
