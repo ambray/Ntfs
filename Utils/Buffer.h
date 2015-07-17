@@ -100,6 +100,7 @@ public:
 	virtual const BUFFER_ATTRIBS& getAttribs();
 	virtual int copyToOffset(PVOID src, SIZE_T offset, SIZE_T len);
 	virtual int copyFromOffset(PVOID dst, SIZE_T offset, SIZE_T len);
+	virtual PVOID pointerFromOffset(SIZE_T offset);
 private:
 	PBYTE buffer;
 	SIZE_T currentSize;

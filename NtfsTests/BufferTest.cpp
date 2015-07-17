@@ -228,3 +228,25 @@ TEST(BufferTest, TestAlternateConstructor)
 	ASSERT_EQ(bufAttrs.type, d.getCurrentType());
 	
 }
+
+
+
+TEST(BufferTest, TestPointerFromOffset)
+{
+	BYTE buf[1024];
+	Buffer b(2048);
+
+	memset(buf, 0x41, 1024);
+
+	const PBYTE tmp = b.getBuffer();
+	ASSERT_NE(NULL, (SIZE_T)tmp);
+	memset(tmp, 0x43, 1024);
+	memset(((PBYTE)tmp + 1024), 0x41, 1024);
+
+	PVOID tmp2 = b.pointerFromOffset(3000);
+	ASSERT_EQ(ERROR_INSUFFICIENT_BUFFER, GetLastError());
+	ASSERT_EQ(NULL, (SIZE_T)tmp2);
+	tmp2 = b.pointerFromOffset(1024);
+	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, tmp2, 1024));
+
+}

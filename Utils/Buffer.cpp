@@ -330,3 +330,22 @@ int Buffer::setType(BufferType bt)
 
 	return status;
 }
+
+
+/**
+* Returns either a pointer to the requested offset in the buffer, 
+* or NULL if the requested index is outside the  current buffer boundaries.
+*/
+PVOID Buffer::pointerFromOffset(SIZE_T offset)
+{
+	PVOID os = NULL;
+	
+	if (offset > currentSize) {
+		SetLastError(ERROR_INSUFFICIENT_BUFFER);
+		return os;
+	}
+
+	os = ((PBYTE)buffer + offset);
+
+	return os;
+}
