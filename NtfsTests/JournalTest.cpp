@@ -181,3 +181,19 @@ TEST(JournalTest, MapFunctionTest)
 	ASSERT_EQ(ERROR_SUCCESS, j.map(fn));
 }
 
+TEST(JournalTest, TestBadData)
+{
+	USN_JOURNAL_DATA jd = { 0 };
+	Journal j;
+	Buffer b(10);
+	DWORD bytes;
+	DWORDLONG maxSz = 30000;
+	DWORDLONG allocDelta = 300;
+	USN next = 0;
+
+	ASSERT_EQ(ERROR_INVALID_HANDLE, j.deleteJournal());
+	ASSERT_EQ(ERROR_INVALID_HANDLE, j.createJournal(maxSz, allocDelta));
+	ASSERT_EQ(ERROR_INVALID_PARAMETER, j.getRecords(b, next, NULL));
+	ASSERT_EQ(ERROR_INVALID_HANDLE, j.resetJournal());
+	ASSERT_EQ(ERROR_INVALID_HANDLE, j.setHandle((HANDLE)12345));
+}

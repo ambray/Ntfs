@@ -73,10 +73,11 @@ int Buffer::resize(SIZE_T nsize)
 	if (currentSize >= nsize)
 		return status;
 
+	if (NULL != buffer) {
+		if (ERROR_SUCCESS != (status = internalFree(buffer)))
+			return status;
+	}
 	
-	if (ERROR_SUCCESS != (status = internalFree(buffer)))
-		return status;
-
 	status = internalAllocate(nsize);
 	clear();
 
@@ -292,8 +293,10 @@ int Buffer::internalFree(PVOID buffer)
 			error = status = GetLastError();
 	}
 
-	currentSize = 0;
-	this->buffer = NULL;
+	if (ERROR_SUCCESS == status) {
+		currentSize = 0;
+		this->buffer = NULL;
+	}
 
 	return status;
 }
@@ -348,4 +351,19 @@ PVOID Buffer::pointerFromOffset(SIZE_T offset)
 	os = ((PBYTE)buffer + offset);
 
 	return os;
+}
+
+/**
+* Convenience function to check whether or not
+* the current Buffer object is valid.
+*/
+bool Buffer::isValid()
+{
+	bool valid = false;
+
+	if (NULL == buffer || 0 == currentSize)
+		return valid;
+
+	valid = true;
+	return valid;
 }

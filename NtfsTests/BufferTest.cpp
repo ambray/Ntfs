@@ -250,3 +250,15 @@ TEST(BufferTest, TestPointerFromOffset)
 	ASSERT_EQ(ERROR_SUCCESS, memcmp(buf, tmp2, 1024));
 
 }
+
+
+TEST(BufferTest, IsValidTest)
+{
+	Buffer b((DWORD)-1); // an allocation we expect to fail
+
+	ASSERT_FALSE(b.isValid());
+
+	ASSERT_EQ(ERROR_SUCCESS, b.resize(1024));
+	ASSERT_TRUE(b.isValid());
+
+}

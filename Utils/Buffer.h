@@ -1,5 +1,6 @@
 #pragma once
 
+
 #include <Windows.h>
 #include <crtdbg.h>
 
@@ -78,6 +79,7 @@ public:
 	virtual const BUFFER_ATTRIBS& getAttribs() = 0;
 	virtual int copyToOffset(PVOID src, SIZE_T offset, SIZE_T len) = 0;
 	virtual int copyFromOffset(PVOID dst, SIZE_T offset, SIZE_T len) = 0;
+	virtual bool isValid() = 0;
 };
 
 
@@ -101,6 +103,7 @@ public:
 	virtual int copyToOffset(PVOID src, SIZE_T offset, SIZE_T len);
 	virtual int copyFromOffset(PVOID dst, SIZE_T offset, SIZE_T len);
 	virtual PVOID pointerFromOffset(SIZE_T offset);
+	virtual bool isValid();
 private:
 	PBYTE buffer;
 	SIZE_T currentSize;

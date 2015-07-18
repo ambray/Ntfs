@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include"..\ChangeJournal\ntfs_defs.h"
 
 TEST(VolumeTest, TestVolInfo)
 {
@@ -17,6 +18,8 @@ TEST(VolumeTest, TestVolInfo)
 	HANDLE tmp = INVALID_HANDLE_VALUE;
 
 	ASSERT_EQ(ERROR_INVALID_HANDLE, v.setHandle(tmp));
+
+	ASSERT_EQ(ERROR_INVALID_HANDLE, v.getVolInfo(v1));
 
 	tmp = CreateFileA("\\\\.\\C:", GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_DEVICE, NULL);
 	std::cout << "Last Error: " << GetLastError() << std::endl;
@@ -45,9 +48,14 @@ TEST(VolumeTest, TestVolData)
 	PNTFS_VOLUME_DATA_BUFFER volData = NULL;
 	std::wstring volname = L"C:";
 	Volume v(volname);
+	Volume s;
 	DWORD bytes;
 	DWORD size = sizeof(NTFS_VOLUME_DATA_BUFFER) + sizeof(NTFS_EXTENDED_VOLUME_DATA);
 	Buffer b(size);
+	Buffer n(2);
+	Buffer x((DWORD)-1);
+
+	ASSERT_EQ(ERROR_INVALID_HANDLE, s.getVolData(n));
 
 	const HANDLE tmp = v.getHandle();
 	ASSERT_NE(INVALID_HANDLE_VALUE, tmp);
@@ -60,5 +68,58 @@ TEST(VolumeTest, TestVolData)
 	const PBYTE buf = b.getBuffer();
 	ASSERT_EQ(ERROR_SUCCESS, memcmp(volData, (PNTFS_VOLUME_DATA_BUFFER)buf, size));
 	HeapFree(GetProcessHeap(), 0, volData);
+
+	ASSERT_EQ(ERROR_SUCCESS, v.getVolData(x));
+	ASSERT_NE(NULL, (SIZE_T)x.getBuffer());
+
+
+}
+
+
+TEST(VolumeTest, TestGetMftRecord)
+{
+	Volume v(std::wstring(L"C:"));
+	Buffer mft(1024);
+	Volume s;
+
+
+	ASSERT_NE(INVALID_HANDLE_VALUE, v.getHandle());
+	ASSERT_EQ(ERROR_SUCCESS, v.getMftRecordByNumber(0, mft));
+
+	const PNTFS_RECORD_HEADER rec = (const PNTFS_RECORD_HEADER)mft.getBuffer();
+	ASSERT_NE(NULL, (SIZE_T)rec);
+	mft.resize(100);
+	ASSERT_EQ(ERROR_SUCCESS, v.getMftRecordByNumber(100, mft));
+	ASSERT_EQ(ERROR_INVALID_HANDLE, s.getMftRecordByNumber(0, mft));
+
+
+
+}
+
+TEST(VolumeTest, TestGetFileCound)
+{
+	HANDLE hFile = INVALID_HANDLE_VALUE;
+	LONGLONG fCount;
+	Volume s;
+
+	hFile = CreateFileA("\\\\.\\C:", GENERIC_READ | GENERIC_WRITE | SYNCHRONIZE, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_DEVICE, NULL);
+	ASSERT_NE(INVALID_HANDLE_VALUE, hFile);
+
+	Volume v(hFile);
+	ASSERT_NE(INVALID_HANDLE_VALUE, v.getHandle());
+
+	ASSERT_EQ(ERROR_SUCCESS, v.getFileCount(fCount));
+	ASSERT_NE(0, fCount);
+
+	ASSERT_EQ(ERROR_INVALID_HANDLE, s.getFileCount(fCount));
+
+}
+
+TEST(VolumeTest, TestBadData)
+{
+	Volume v;
+
+	ASSERT_EQ(ERROR_INVALID_HANDLE, v.setHandle((HANDLE)12345));
+	ASSERT_EQ(ERROR_FILE_NOT_FOUND, v.vopen(std::wstring(L"asdfasdfjl")));
 
 }

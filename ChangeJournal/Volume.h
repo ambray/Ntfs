@@ -6,6 +6,9 @@
 #include "..\Utils\Buffer.h"
 #include "ntfs_defs.h"
 
+
+#define VOL_DATA_SIZE sizeof(NTFS_VOLUME_DATA_BUFFER) + sizeof(NTFS_EXTENDED_VOLUME_DATA)
+
 typedef struct {
 	std::wstring volName;
 	std::wstring fsName;
@@ -40,8 +43,9 @@ public:
 	virtual int getVolData(Buffer& db);
 	virtual int getMftRecordByNumber(LONGLONG, Buffer& buf);
 	virtual int getFileCount(LONGLONG& count);
+	int vopen(std::wstring& fname);
 private:
+	Buffer volData;
 	HANDLE hVol;
 
-	int vopen(std::wstring& fname);
 };

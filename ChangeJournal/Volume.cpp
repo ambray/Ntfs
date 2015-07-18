@@ -1,11 +1,11 @@
 #include "Volume.h"
 
-Volume::Volume() : hVol(INVALID_HANDLE_VALUE)
+Volume::Volume() : hVol(INVALID_HANDLE_VALUE), volData(VOL_DATA_SIZE)
 {
 
 }
 
-Volume::Volume(std::wstring& volName) : hVol(INVALID_HANDLE_VALUE)
+Volume::Volume(std::wstring& volName) : hVol(INVALID_HANDLE_VALUE), volData(VOL_DATA_SIZE)
 {
 	std::wstring path = L"\\\\.\\";
 	path += volName;
@@ -13,7 +13,7 @@ Volume::Volume(std::wstring& volName) : hVol(INVALID_HANDLE_VALUE)
 	vopen(path);
 }
 
-Volume::Volume(HANDLE volHandle) : hVol(INVALID_HANDLE_VALUE)
+Volume::Volume(HANDLE volHandle) : hVol(INVALID_HANDLE_VALUE), volData(VOL_DATA_SIZE)
 {
 	setHandle(volHandle);
 }
@@ -73,30 +73,66 @@ int Volume::getVolInfo(VOL_INFO& vi)
 
 int Volume::getVolData(Buffer& db) 
 {
+	BYTE tmpData[VOL_DATA_SIZE] = { 0 };
 	int status = ERROR_SUCCESS;
 	DWORD tmp;
-	DWORD alloc = sizeof(NTFS_VOLUME_DATA_BUFFER) + sizeof(NTFS_EXTENDED_VOLUME_DATA);
+	DWORD alloc = VOL_DATA_SIZE;
 
 	if (INVALID_HANDLE_VALUE == hVol)
 		return ERROR_INVALID_HANDLE;
 
-	if (alloc > db.size())
+	if (!db.isValid() || alloc > db.size())
 		status = db.resize(alloc);
 
 	if (ERROR_SUCCESS != status)
 		return status;
 
 
-	if (!DeviceIoControl(hVol, FSCTL_GET_NTFS_VOLUME_DATA, NULL, 0, db.getBuffer(), db.size(), &tmp, NULL)) {
+	if (!DeviceIoControl(hVol, FSCTL_GET_NTFS_VOLUME_DATA, NULL, 0, tmpData, VOL_DATA_SIZE, &tmp, NULL)) {
 		return GetLastError();
 	}
+
+	db.copyTo(tmpData, VOL_DATA_SIZE);
 
 	return status;
 }
 
-int Volume::getMftRecordByNumber(LONGLONG, Buffer& buf) 
+
+/**
+* Will get a record from the MFT based on its record number.
+*/
+int Volume::getMftRecordByNumber(LONGLONG recordNum, Buffer& buffer) 
 {
-	int status = ERROR_SUCCESS;
+	NTFS_FILE_RECORD_INPUT_BUFFER	ntInBuff = { 0 };
+	PNTFS_FILE_RECORD_OUTPUT_BUFFER	ntOutBuff = NULL;
+	ULONG							recordSize = 0;
+	ULONG							bytesRet;
+	int								status = ERROR_SUCCESS;
+	
+	if (INVALID_HANDLE_VALUE == hVol)
+		return ERROR_INVALID_HANDLE;
+
+	status = getVolData(volData);
+
+	if (ERROR_SUCCESS != status)
+		return status;
+
+	const PNTFS_VOLUME_DATA_BUFFER data = (PNTFS_VOLUME_DATA_BUFFER)volData.getBuffer();
+	if (NULL == data)
+		return ERROR_OUTOFMEMORY;
+
+	recordSize = data->BytesPerFileRecordSegment;
+	recordSize += sizeof(NTFS_FILE_RECORD_OUTPUT_BUFFER);
+	if (!buffer.isValid() || recordSize > buffer.size())
+		status = buffer.resize(recordSize);
+
+	if (ERROR_SUCCESS != status)
+		return status;
+
+	ntInBuff.FileReferenceNumber.QuadPart = recordNum;
+	if (!DeviceIoControl(hVol, FSCTL_GET_NTFS_FILE_RECORD, &ntInBuff, sizeof(ntInBuff), buffer.getBuffer(), buffer.size(), &bytesRet, NULL)) {
+		status = GetLastError();
+	}
 
 	return status;
 }
@@ -104,6 +140,26 @@ int Volume::getMftRecordByNumber(LONGLONG, Buffer& buf)
 int Volume::getFileCount(LONGLONG& count) 
 {
 	int status = ERROR_SUCCESS;
+	LARGE_INTEGER num = { 0 };
+
+	if (INVALID_HANDLE_VALUE == hVol)
+		return ERROR_INVALID_HANDLE;
+
+	status = getVolData(volData);
+
+	if (ERROR_SUCCESS != status)
+		return status;
+
+	const PNTFS_VOLUME_DATA_BUFFER buf = (const PNTFS_VOLUME_DATA_BUFFER)volData.getBuffer();
+	if (NULL == buf)
+		return ERROR_INVALID_STATE;
+	
+	num.QuadPart = buf->BytesPerFileRecordSegment;
+
+	if (0 == num.QuadPart)
+		return ERROR_BAD_ARGUMENTS;
+
+	count = buf->MftValidDataLength.QuadPart / num.QuadPart;
 
 	return status;
 }
@@ -119,6 +175,7 @@ int Volume::vopen(std::wstring& fname)
 		return GetLastError();
 	}
 
+	status = getVolData(volData);
 
 	return status;
 }
