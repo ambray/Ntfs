@@ -7,6 +7,7 @@
 #include <fstream>
 #include <functional>
 #include <vector>
+#include <deque>
 #include "..\Utils\Buffer.h"
 #include "..\Utils\Marshaller.h"
 
@@ -61,7 +62,7 @@ namespace ChangeJournal {
 
 	
 
-	int walkRecordBuffer(Buffer& buf, IJournal* journ, IMarshaller* marsh, std::vector<std::wstring>& output, USN* next, DWORD bytesToWalk);
+	int walkRecordBuffer(Buffer& buf, IJournal* journ, IMarshaller* marsh, std::deque<std::wstring>& output, USN* next, DWORD bytesToWalk);
 	int getRecords(IJournal* journal, Buffer& buf, USN& next, PDWORD bytesRead);
-	int enumerateRecords(IJournal* journal, IMarshaller* marshaller, std::vector<std::wstring>& output);
+	int enumerateRecords(IJournal* journal, IMarshaller* marshaller, std::deque<std::wstring>& output);
 }

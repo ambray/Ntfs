@@ -2,7 +2,7 @@
 
 #include <Windows.h>
 #include <string>
-#include <vector>
+#include <deque>
 #include <iostream>
 #include <fstream>
 #include <regex>
@@ -22,7 +22,7 @@ public:
 	virtual int marshallLongLong(PWCHAR, LONGLONG&, std::wstring&) = 0;
 	virtual int marshallBytes(PWCHAR, PBYTE, SIZE_T, std::wstring&) = 0;
 	virtual int marshallWstr(PWCHAR, PWCHAR, SIZE_T, std::wstring&) = 0;
-	virtual int recordsToFile(std::wstring&, std::vector<std::wstring>&, bool) = 0;
+	virtual int recordsToFile(std::wstring&, std::deque<std::wstring>&, bool) = 0;
 	virtual const DataFormat marshallerType() = 0;
 };
 
@@ -37,6 +37,6 @@ public:
 	virtual int marshallLongLong(PWCHAR key, LONGLONG& in, std::wstring& output);
 	virtual int marshallBytes(PWCHAR key, PBYTE in, SIZE_T len, std::wstring& output);
 	virtual int marshallWstr(PWCHAR key, PWCHAR in, SIZE_T len, std::wstring& output);
-	virtual int recordsToFile(std::wstring& outfile, std::vector<std::wstring>& strbuf, bool truncate=true);
+	virtual int recordsToFile(std::wstring& outfile, std::deque<std::wstring>& strbuf, bool truncate=true);
 	virtual const DataFormat marshallerType();
 };

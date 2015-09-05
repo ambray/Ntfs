@@ -362,7 +362,7 @@ int Journal::queryJournal()
 /**
 * Walk the given change journal buffer, recording the next record in the sequest in "next".
 */
-int ChangeJournal::walkRecordBuffer(Buffer& buf, IJournal* journ, IMarshaller* marsh, std::vector<std::wstring>& output, USN* next, DWORD bytesToWalk)
+int ChangeJournal::walkRecordBuffer(Buffer& buf, IJournal* journ, IMarshaller* marsh, std::deque<std::wstring>& output, USN* next, DWORD bytesToWalk)
 {
 	int status = ERROR_SUCCESS;
 	std::wstring tmp;
@@ -434,7 +434,7 @@ int ChangeJournal::getRecords(IJournal* journal, Buffer& buf, USN& next, PDWORD 
 * Reads the entire change journal, marshalling all of the records, and storing the resulting strings into the provided
 * std::vector.
 */
-int ChangeJournal::enumerateRecords(IJournal* journal, IMarshaller* marshaller, std::vector<std::wstring>& vec)
+int ChangeJournal::enumerateRecords(IJournal* journal, IMarshaller* marshaller, std::deque<std::wstring>& vec)
 {
 	int status = ERROR_SUCCESS;
 	Buffer buf(QUERY_BUFFER_SIZE);

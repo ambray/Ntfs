@@ -4,6 +4,7 @@
 #include "..\Utils\Marshaller.h"
 #include "..\Utils\ArgParser.h"
 #include <vector>
+#include <deque>
 #include <string>
 #include <iostream>
 
@@ -48,7 +49,7 @@ int queryChangeJournal(std::wstring& volume, std::wstring& outfile)
 	int status = ERROR_SUCCESS;
 	Journal journ(volume);
 	JsonMarshaller jmarsh;
-	std::vector<std::wstring> vec;
+	std::deque<std::wstring> vec;
 
 	if (ERROR_SUCCESS != (status = ChangeJournal::enumerateRecords((IJournal*)&journ, (IMarshaller*)&jmarsh, vec))) {
 		std::wcout << std::endl << L"[x] Failed to open change journal!";

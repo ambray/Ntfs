@@ -143,10 +143,10 @@ int JsonMarshaller::marshallWstr(PWCHAR key, PWCHAR in, SIZE_T len, std::wstring
 
 
 /**
-* Writes a std::vector of marshalled records out to file, truncating if "truncate" is set to true,
+* Writes a std::deque of marshalled records out to file, truncating if "truncate" is set to true,
 * appending otherwise.
 */
-int JsonMarshaller::recordsToFile(std::wstring& outfile, std::vector<std::wstring>& recs, bool truncate)
+int JsonMarshaller::recordsToFile(std::wstring& outfile, std::deque<std::wstring>& recs, bool truncate)
 {
 	int status = ERROR_SUCCESS;
 	std::wfstream f;

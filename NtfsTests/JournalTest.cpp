@@ -160,7 +160,7 @@ TEST(JournalTest, TestBufferEnum)
 {
 	JsonMarshaller jm;
 	Journal j(std::wstring(L"C:"));
-	std::vector<std::wstring> list;
+	std::deque<std::wstring> list;
 
 	ASSERT_TRUE(generateNoise());
 
