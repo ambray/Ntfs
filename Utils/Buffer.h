@@ -2,39 +2,9 @@
 
 
 #include <Windows.h>
+#include <memory>
 #include <crtdbg.h>
 
-class Lock {
-public:
-
-	Lock() : cs(NULL) {};
-
-	Lock(PCRITICAL_SECTION sc) : cs(sc)
-	{
-		setLock(cs);
-	}
-
-	VOID setLock(PCRITICAL_SECTION section)
-	{
-		cs = section;
-
-		_ASSERTE(NULL != cs);
-		useLock();
-	}
-
-	VOID useLock() { EnterCriticalSection(cs); }
-
-	VOID unlock()
-	{
-		_ASSERTE(NULL != cs);
-		LeaveCriticalSection(cs);
-	}
-
-	~Lock() { (NULL != cs) ? unlock() : (VOID*)0; }
-
-private:
-	PCRITICAL_SECTION cs;
-};
 
 
 typedef enum {
@@ -105,11 +75,10 @@ public:
 	virtual PVOID pointerFromOffset(SIZE_T offset);
 	virtual bool isValid();
 private:
-	PBYTE buffer;
+	std::shared_ptr<BYTE> buffer;
 	SIZE_T currentSize;
 	BUFFER_ATTRIBS bAttrs;
 	int error;
 
 	int internalAllocate(SIZE_T size);
-	int internalFree(PVOID buffer);
 };

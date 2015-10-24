@@ -1,7 +1,7 @@
 #include "Buffer.h"
 
 
-Buffer::Buffer(SIZE_T size, BufferType bt) : error(ERROR_SUCCESS), currentSize(size), buffer(NULL)
+Buffer::Buffer(SIZE_T size, BufferType bt) : error(ERROR_SUCCESS), currentSize(size)
 {
 	ZeroMemory(&bAttrs, sizeof(bAttrs));
 
@@ -45,14 +45,12 @@ Buffer::Buffer(PBYTE buf, SIZE_T len, BufferType bt) : error(ERROR_SUCCESS), cur
 
 Buffer::~Buffer()
 {
-	if (NULL != buffer)
-		internalFree(buffer);
 
 }
 
 const PBYTE Buffer::getBuffer()
 {
-	return const_cast<const PBYTE>(buffer);
+	return const_cast<const PBYTE>(buffer.get());
 }
 
 SIZE_T Buffer::size()
@@ -73,9 +71,8 @@ int Buffer::resize(SIZE_T nsize)
 	if (currentSize >= nsize)
 		return status;
 
-	if (NULL != buffer) {
-		if (ERROR_SUCCESS != (status = internalFree(buffer)))
-			return status;
+	if (buffer) {
+		buffer.reset();
 	}
 	
 	status = internalAllocate(nsize);
@@ -91,10 +88,10 @@ int Buffer::getError()
 
 VOID Buffer::clear()
 {
-	if (NULL == buffer)
+	if (!buffer)
 		return;
 
-	ZeroMemory(buffer, currentSize);
+	ZeroMemory(buffer.get(), currentSize);
 }
 
 
@@ -113,7 +110,7 @@ int Buffer::copyTo(PVOID src, SIZE_T len)
 		return ERROR_BUFFER_OVERFLOW;
 
 	clear();
-	RtlCopyMemory(buffer, src, len);
+	RtlCopyMemory(buffer.get(), src, len);
 
 	return status;
 }
@@ -133,7 +130,7 @@ int Buffer::copyFrom(PVOID dst, SIZE_T len)
 		return ERROR_BUFFER_OVERFLOW;
 
 	ZeroMemory(dst, len);
-	RtlCopyMemory(dst, buffer, currentSize);
+	RtlCopyMemory(dst, buffer.get(), currentSize);
 
 	return status;
 }
@@ -149,7 +146,7 @@ int Buffer::compare(PVOID buf, SIZE_T len)
 	if (len > currentSize)
 		return ERROR_BUFFER_OVERFLOW;
 
-	status = memcmp(buffer, buf, len);
+	status = memcmp(buffer.get(), buf, len);
 
 	return status;
 }
@@ -167,7 +164,7 @@ int Buffer::copyFromOffset(PVOID dst, SIZE_T offset, SIZE_T len)
 	if ((offset + len) > currentSize)
 		return ERROR_BUFFER_OVERFLOW;
 
-	RtlCopyMemory(dst, ((PBYTE)buffer + offset), len);
+	RtlCopyMemory(dst, ((PBYTE)buffer.get() + offset), len);
 
 	return status;
 }
@@ -186,7 +183,7 @@ int Buffer::copyToOffset(PVOID src, SIZE_T offset, SIZE_T len)
 	if ((offset + len) > currentSize)
 		return ERROR_BUFFER_OVERFLOW;
 
-	RtlCopyMemory(((PBYTE)buffer + offset), src, len);
+	RtlCopyMemory(((PBYTE)buffer.get() + offset), src, len);
 
 	return status;
 }
@@ -207,10 +204,7 @@ int Buffer::setAttribs(PBUFFER_ATTRIBS attribs)
 		return ERROR_INVALID_PARAMETER;
 
 	if (attribs->type != bAttrs.type) {
-		if (ERROR_SUCCESS != (status = internalFree(buffer))) {
-			error = status;
-			return status;
-		}
+		buffer.reset();
 
 		bAttrs.type = attribs->type;
 
@@ -230,14 +224,14 @@ int Buffer::setAttribs(PBUFFER_ATTRIBS attribs)
 		// current buffer before switching handles
 		if (BufferType::TypeHeap == bAttrs.type) {
 			oldSize = currentSize;
-			if (ERROR_SUCCESS != (status = internalFree(buffer)))
-				return status;
+
+			buffer.reset();
 
 			bAttrs.u.hHeap = attribs->u.hHeap;
 			status = internalAllocate(oldSize);
 		}
 		else if (BufferType::TypeVirtual == bAttrs.type) {
-			if (!VirtualProtect(buffer, currentSize, attribs->u.memProtect, &oldSize)) {
+			if (!VirtualProtect(buffer.get(), currentSize, attribs->u.memProtect, &oldSize)) {
 				status = GetLastError();
 			}
 		}
@@ -256,47 +250,22 @@ const BUFFER_ATTRIBS& Buffer::getAttribs()
 int Buffer::internalAllocate(SIZE_T size)
 {
 	int status = ERROR_SUCCESS;
+	PBYTE tmp = nullptr;
 
 	if (BufferType::TypeVirtual == bAttrs.type) {
-		if (NULL == (buffer = (PBYTE)VirtualAlloc(NULL, size, MEM_COMMIT, bAttrs.u.memProtect))) {
+		if (NULL == (tmp = (PBYTE)VirtualAlloc(NULL, size, MEM_COMMIT, bAttrs.u.memProtect))) {
 			error = status = GetLastError();
 		}
+		buffer = std::shared_ptr<BYTE>(tmp, [&](PVOID p) { VirtualFree(p, currentSize, MEM_RELEASE); });
 	}
 	else if (BufferType::TypeHeap == bAttrs.type) {
-		if (NULL == (buffer = (PBYTE)HeapAlloc(bAttrs.u.hHeap, HEAP_ZERO_MEMORY, size))) {
+		if (NULL == (tmp = (PBYTE)HeapAlloc(bAttrs.u.hHeap, HEAP_ZERO_MEMORY, size))) {
 			error = status = GetLastError();
 		}
+		buffer = std::shared_ptr<BYTE>(tmp, [&](PVOID p) { HeapFree(bAttrs.u.hHeap, 0, p); });
 	}
 
-	currentSize = size;
-	if (NULL == buffer)
-		currentSize = 0;
-
-	return status;
-}
-
-int Buffer::internalFree(PVOID buffer)
-{
-	int status = ERROR_SUCCESS;
-
-	if (NULL == buffer) {
-		error = status = ERROR_INVALID_PARAMETER;
-		return status;
-	}
-
-	if (BufferType::TypeVirtual == bAttrs.type) {
-		if (!VirtualFree(buffer, 0, MEM_RELEASE))
-			error = status = GetLastError();
-	}
-	else if (BufferType::TypeHeap == bAttrs.type) {
-		if (!HeapFree(bAttrs.u.hHeap, 0, buffer))
-			error = status = GetLastError();
-	}
-
-	if (ERROR_SUCCESS == status) {
-		currentSize = 0;
-		this->buffer = NULL;
-	}
+	currentSize = buffer ? size : 0;
 
 	return status;
 }
@@ -315,10 +284,8 @@ int Buffer::setType(BufferType bt)
 	if (bt == bAttrs.type)
 		return ERROR_SUCCESS;
 
-	if (NULL != buffer) {
-		if (ERROR_SUCCESS != (status = internalFree(buffer))) {
-			return status;
-		}
+	if (buffer) {
+		buffer.reset();
 	}
 
 	if (bt == BufferType::TypeHeap)
@@ -348,7 +315,7 @@ PVOID Buffer::pointerFromOffset(SIZE_T offset)
 		return os;
 	}
 
-	os = ((PBYTE)buffer + offset);
+	os = ((PBYTE)buffer.get() + offset);
 
 	return os;
 }
