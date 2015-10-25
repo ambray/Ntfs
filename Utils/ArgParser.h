@@ -5,6 +5,7 @@
 #include <iostream>
 #include <regex>
 #include <map>
+#include <codecvt>
 #include <vector>
 
 
@@ -22,17 +23,18 @@ static WCHAR* delimExp = L"^(--|-|/)";
 class ArgParser {
 public:
 	ArgParser(WCHAR** argv, int argc);
+	ArgParser(CHAR** argv, int argc);
 	~ArgParser();
 	bool helpRequested();
 	
-	bool getAttribute(std::wstring& attrib, std::wstring& out);
-	bool getAttribute(PWSTR attrib, std::wstring& out);
-	bool getAttribute(std::wstring& attrib);
-	bool getAttribute(PWSTR attrib);
+	bool getAttribute(std::wstring attrib, std::wstring& out);
+	bool getAttribute(std::wstring attrib);
 
+	bool getAttribute(std::string attrib, std::string& out);
+	bool getAttribute(std::string attrib);
 
 	bool stripDelims(std::wstring& arg);
-	int parseArgs(WCHAR** argv, int argc);
+	int parseArgs(std::vector<std::wstring>& argv);
 	const std::map<std::wstring, std::wstring>& getArgs();
 
 private:

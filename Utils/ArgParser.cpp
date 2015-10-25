@@ -2,7 +2,31 @@
 
 ArgParser::ArgParser(WCHAR** argv, int argc) : help(false)
 {
-	parseArgs(argv, argc);
+	std::vector<std::wstring> vec;
+
+	if (nullptr == argv || 0 == argc || nullptr == *argv)
+		throw std::runtime_error("Invalid arguments provided on command line!");
+
+	for (auto i = 0; i < argc; ++i)
+		vec.push_back(argv[i]);
+
+	parseArgs(vec);
+}
+
+ArgParser::ArgParser(CHAR** argv, int argc)
+{
+	std::vector<std::wstring> vec;
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+
+	if(nullptr == argv || 0 == argc || nullptr == *argv)
+		throw std::runtime_error("Invalid arguments provided on command line!");
+
+	for (auto i = 0; i < argc; ++i) {
+		auto tmp = conv.from_bytes(argv[i]);
+		vec.push_back(tmp);
+	}
+
+	parseArgs(vec);
 }
 
 
@@ -84,18 +108,15 @@ bool ArgParser::hasDelim(std::wstring& arg, std::wstring* storage)
 /**
 * Initializes the map containing all parsed, normalized action/argument pairs.
 */
-int ArgParser::parseArgs(WCHAR** argv, int argc)
+int ArgParser::parseArgs(std::vector<std::wstring>& argv)
 {
 	int status = ERROR_SUCCESS;
-	
-	if (NULL == argv || 0 == argc)
-		return ERROR_INVALID_PARAMETER;
+	int i = 0;
 
-	if (1 == argc)
+	if (1 == argv.size())
 		return ERROR_NO_MORE_ITEMS;
 
-	for (auto i = 0; i < argc; ++i) {
-		std::wstring tmp(argv[i]);
+	for (auto tmp : argv) {
 		std::wstring cont;
 
 		if (isHelpOpt(tmp))
@@ -103,7 +124,7 @@ int ArgParser::parseArgs(WCHAR** argv, int argc)
 
 		if (hasDelim(tmp)) {
 			stripDelims(tmp);
-			if ((i + 1) < argc && !hasDelim(std::wstring(argv[i+1]), &cont)) {
+			if ((i + 1) < argv.size() && !hasDelim(std::wstring(argv[i+1]), &cont)) {
 				args.insert(std::pair<std::wstring, std::wstring>(tmp, cont));
 				++i;
 			}
@@ -111,7 +132,7 @@ int ArgParser::parseArgs(WCHAR** argv, int argc)
 				args.insert(std::pair<std::wstring, std::wstring>(tmp, std::wstring(L"enabled")));
 			}
 		}
-
+		++i;
 	}
 
 	return status;
@@ -146,45 +167,36 @@ const std::map<std::wstring, std::wstring>& ArgParser::getArgs()
 	return args;
 }
 
-bool ArgParser::getAttribute(std::wstring& attrib, std::wstring& out)
+bool ArgParser::getAttribute(std::wstring attrib, std::wstring& out)
 {
 
 	return locate(attrib, &out);
 
 }
 
-bool ArgParser::getAttribute(PWCHAR attrib, std::wstring& out)
-{
-	bool found = false;
-	std::wstring cont;
 
-	if (NULL == attrib)
-		return found;
-
-	cont = attrib;
-
-	found = locate(cont, &out);
-
-	return found;
-}
-
-
-bool ArgParser::getAttribute(std::wstring& attrib)
+bool ArgParser::getAttribute(std::wstring attrib)
 {
 	return locate(attrib);
 }
 
-bool ArgParser::getAttribute(PWCHAR attrib)
+bool ArgParser::getAttribute(std::string attrib, std::string& out)
 {
-	bool found = false;
-	std::wstring tmp;
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+	std::wstring outVal = conv.from_bytes(out);
+	auto inVal = conv.from_bytes(attrib);
 
-	if (NULL == attrib)
-		return found;
+	auto tmp = locate(inVal, &outVal);
+	out = conv.to_bytes(outVal);
 
-	tmp = attrib;
-
-	found = locate(tmp);
-
-	return found;
+	return tmp;
 }
+
+bool ArgParser::getAttribute(std::string attrib)
+{
+	std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+	
+	auto inv = conv.from_bytes(attrib);
+	return locate(inv);
+}
+

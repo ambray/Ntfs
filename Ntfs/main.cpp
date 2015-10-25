@@ -1,9 +1,11 @@
 #include <Windows.h>
-#include "..\ChangeJournal\Journal.h"
+#include "..\ChangeJournal\ChangeJournal.hpp"
 #include "..\Utils\Buffer.h"
 #include "..\Utils\Marshaller.h"
 #include "..\Utils\ArgParser.h"
 #include <vector>
+#include <codecvt>
+#include <sstream>
 #include <deque>
 #include <string>
 #include <iostream>
@@ -44,44 +46,63 @@ static WCHAR* supportedArgs[] = {
 };
 
 
-int queryChangeJournal(std::wstring& volume, std::wstring& outfile)
+int queryChangeJournal(std::shared_ptr<void> volume, std::string& outfile)
 {
 	int status = ERROR_SUCCESS;
-	Journal journ(volume);
-	JsonMarshaller jmarsh;
-	std::deque<std::wstring> vec;
-
-	if (ERROR_SUCCESS != (status = ChangeJournal::enumerateRecords((IJournal*)&journ, (IMarshaller*)&jmarsh, vec))) {
-		std::wcout << std::endl << L"[x] Failed to open change journal!";
-		return status;
+	try {
+		ntfs::ChangeJournal journal(volume);
+		journal.mapRecords([&](auto p) {
+			DWORD bytes;
+			auto tmp = ntfs::usn_stringify_to_json(p);
+			std::cout << "Record: " << tmp << std::endl;
+		});
+	}
+	catch (const std::exception& e) {
+		std::cout << e.what() << std::endl;
+		status = ERROR_FAIL_FAST_EXCEPTION;
 	}
 
-	status = jmarsh.recordsToFile(outfile, vec);
 
 	return status;
 }
 
-int resetChangeJournal(std::wstring& volume)
+int resetChangeJournal(std::shared_ptr<void> vol)
 {
 	int status = ERROR_SUCCESS;
-	Journal journ(volume);
 
-	status = journ.resetJournal();
+	try {
+		ntfs::ChangeJournal journal(vol);
+		if (!journal.resetJournal()) {
+			std::cout << "Unable to reset the journal!" << std::endl;
+			return ERROR_FAIL_NOACTION_REBOOT;
+		}
+	}
+	catch (const std::exception& e) {
+		std::cout << e.what() << std::endl;
+		status = ERROR_EXCEPTION_IN_RESOURCE_CALL;
+	}
+	
+	if (ERROR_SUCCESS == status)
+		std::cout << "The operation completed successfully." << std::endl;
 
 	return status;
 }
 
-int deleteChangeJournal(std::wstring& volume)
+int deleteChangeJournal(std::shared_ptr<void> vol)
 {
 	int status = ERROR_SUCCESS;
-	Journal journ(volume);
 
-	status = journ.deleteJournal();
+	try {
+
+	}
+	catch (const std::exception& e) {
+
+	}
 
 	return status;
 }
 
-static inline VOID printHelp()
+static VOID printHelp()
 {
 	DWORD msgIndex = 0;
 
@@ -98,7 +119,7 @@ static inline VOID printHelp()
 	}
 }
 
-static inline DWORD getActions(ArgParser& ap)
+static DWORD getActions(ArgParser& ap)
 {
 	DWORD tmp = 0;
 
@@ -116,14 +137,15 @@ static inline DWORD getActions(ArgParser& ap)
 
 
 
-int wmain(int argc, WCHAR** argv, WCHAR** envp)
+int main(int argc, char** argv, char** envp)
 {
 	int status = ERROR_SUCCESS;
-	std::wstring volume = L"C:";
-	std::wstring outfile = L"out.json";
-	std::wstring outattr;
-	std::wstring currentOp;
+	std::string volume = "\\\\.\\C:";
+	std::string outfile = "out.json";
+	std::string outattr;
+	std::string currentOp;
 	DWORD actionMask = 0;
+
 	ArgParser ap(argv, argc);
 
 	if (ap.helpRequested()) {
@@ -131,11 +153,11 @@ int wmain(int argc, WCHAR** argv, WCHAR** envp)
 		return status;
 	}
 
-	if (ap.getAttribute(L"v", volume) || ap.getAttribute(L"volume", volume)) {
+	if (ap.getAttribute("v", volume) || ap.getAttribute("volume", volume)) {
 		std::wcout << L"[*] Volume change requested" << std::endl;
 	}
 
-	if (ap.getAttribute(L"o", outfile) || ap.getAttribute(L"output", outfile)) {
+	if (ap.getAttribute("o", outfile) || ap.getAttribute("output", outfile)) {
 		std::wcout << L"[*] Output file change requested" << std::endl;
 	}
 
@@ -145,11 +167,15 @@ int wmain(int argc, WCHAR** argv, WCHAR** envp)
 		return status;
 	}
 
-	std::wcout << L"[*] Preparing to perform requested operations on Volume: " << volume << L", storing results in " << outfile << std::endl;
+	std::cout << "[*] Preparing to perform requested operations on Volume: " << volume << ", storing results in " << outfile << std::endl;
+	auto vh = CreateFileA(volume.c_str(), ntfs::vol_access_mask, ntfs::vol_share_mask, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_DEVICE, nullptr);
+	if (INVALID_HANDLE_VALUE == vh)
+		return GetLastError();
 
+	std::shared_ptr<void> vhandle(vh, CloseHandle);
 	if (actionMask & ActionList::QueryJournal) {
 		std::wcout << L"[*] Preparing to enumerate change journal...";
-		if (ERROR_SUCCESS != (status = queryChangeJournal(volume, outfile))) {
+		if (ERROR_SUCCESS != (status = queryChangeJournal(vhandle, outfile))) {
 			std::wcout << std::endl << L"[x] Failed to query the journal! Exited with status: " << status << std::endl;
 			return status;
 		}
@@ -159,7 +185,7 @@ int wmain(int argc, WCHAR** argv, WCHAR** envp)
 
 	if (actionMask & ActionList::ResetJournal) {
 		std::wcout << L"[*] Preparing to reset the change journal...";
-		if (ERROR_SUCCESS != (status = resetChangeJournal(volume))) {
+		if (ERROR_SUCCESS != (status = resetChangeJournal(vhandle))) {
 			std::wcout << std::endl << L"[x] Failed to reset the journal! Exited with status: " << status << std::endl;
 			return status;
 		}
@@ -169,7 +195,7 @@ int wmain(int argc, WCHAR** argv, WCHAR** envp)
 
 	if (actionMask & ActionList::DeleteJournal) {
 		std::wcout << L"[*] Preparing to delete the change journal...";
-		if (ERROR_SUCCESS != (status = deleteChangeJournal(volume))) {
+		if (ERROR_SUCCESS != (status = deleteChangeJournal(vhandle))) {
 			std::wcout << std::endl << L"[x] Failed to delete the journal! Exited with status: " << status << std::endl;
 			return status;
 		}
