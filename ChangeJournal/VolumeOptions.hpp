@@ -31,6 +31,8 @@
 #include <vector>
 #include <tuple>
 #include <codecvt>
+#include <functional>
+#include "ntfs_defs.h"
 
 #define VOL_API_INTERACTION_ERROR(msg, err)\
 	std::runtime_error(("[VolOps] "  msg + std::to_string(__LINE__) + " " + std::to_string(err)))
@@ -52,16 +54,64 @@ namespace ntfs {
 		VolOps& operator=(const VolOps&) = default;
 		VolOps& operator=(VolOps&&) = default;
 
+		/**
+		* Setter method for the HANDLE the class is currently operating on
+		*
+		* @param a shared_ptr containing the HANDLE (e.g., std::shared_ptr<void>(HANDLE, CloseHandle))
+		*/
 		void setVolHandle(std::shared_ptr<void> vh);
+
+		/**
+		* 
+		*
+		*/
 		std::shared_ptr<void> getVolHandle();
 		/// Volume name, filesys name, s/n, max comp. len
+		/**
+		* 
+		*
+		*/
 		std::tuple<std::string, std::string, unsigned long> getVolInfo();
+
+		/**
+		* 
+		*
+		*/
 		std::unique_ptr<NTFS_VOLUME_DATA_BUFFER> getVolData();
+
+		/**
+		* 
+		*
+		*/
 		unsigned long getDriveType();
+
+		/**
+		* 
+		*
+		*/
 		uint64_t getFileCount();
+
+		/**
+		* 
+		*
+		*/
 		std::vector<uint8_t> getMftRecord(uint64_t recNum);
+
+		/**
+		* 
+		*
+		*/
+		std::vector<uint8_t> processMftAttributes(uint64_t recNum, std::function<void(PNTFS_ATTRIBUTE)> func);
+
+		/**
+		* 
+		*
+		*/
+		void processMftAttributes(std::vector<uint8_t>& record, std::function<void(PNTFS_ATTRIBUTE)> func);
 
 	private:
 		std::shared_ptr<void> vhandle;
 	};
+
+
 }
