@@ -38,7 +38,8 @@ namespace ntfs {
 		if (!DeviceIoControl(vhandle.get(), FSCTL_READ_USN_JOURNAL, &rData, sizeof(rData), vec.data(), vec.size(), &bytesRead, nullptr)) {
 
 			unsigned long error = GetLastError();
-
+			// Return an empty vector if the query failed because
+			// no more records exist past the current point
 			if (ERROR_NO_MORE_ITEMS == error) {
 				if (sizeof(USN) <= bytesRead)
 					next = *(reinterpret_cast<USN*>(vec.data()));
@@ -52,7 +53,11 @@ namespace ntfs {
 				throw CG_API_INTERACTION_ERROR("An error occurred while reading the change journal!", error);
 			}
 		}
-
+		// If we don't do this, we would need to pack along bytesRead somehow.
+		// This could be changed for performance reasons (extra copies being bad and all)
+		// down the road, but this is currently done for 1.) convenience, and 2.) due to this
+		// probably not being our biggest bottleneck currently (since we have to go to disk for
+		// more records).
 		vec.resize(bytesRead);
 		if(vec.size() >= sizeof(USN))
 			next = *(reinterpret_cast<USN*>(vec.data()));
@@ -80,7 +85,7 @@ namespace ntfs {
 		return success;
 	}
 
-	bool ChangeJournal::mapRecords(std::function<void(PUSN_RECORD)> func)
+	void ChangeJournal::mapRecords(std::function<void(PUSN_RECORD)> func)
 	{
 		bool success = true;
 		try {
@@ -94,16 +99,11 @@ namespace ntfs {
 
 				success = mapBuffer(vec, func);
 			}
-
-			success = true;
-
 		}
 		catch (const std::exception& e) {
-			auto exc = std::current_exception();
-			std::rethrow_exception(exc);
+			throw std::runtime_error((std::string("[ChangeJournal] An exception occurred! Failed to map change journal records! Caught: ") + e.what()));
 		}
 
-		return success;
 	}
 
 	std::unique_ptr<USN_JOURNAL_DATA> ChangeJournal::getJournalData()
@@ -153,13 +153,17 @@ namespace ntfs {
 	bool ChangeJournal::resetJournal()
 	{
 		bool success = true;
-		auto journalData = getJournalData();
-
-		if ((success = deleteUsnJournal(journalData->UsnJournalID))) {
-			success = createUsnJournal(journalData->MaximumSize, journalData->AllocationDelta);
+		try {
+			auto journalData = getJournalData();
+			if (!(success = deleteUsnJournal(journalData->UsnJournalID))) {
+				return success;
+			}
+			else {
+				success = createUsnJournal(journalData->MaximumSize, journalData->AllocationDelta);
+			}
 		}
-		else {
-			throw CG_API_INTERACTION_LASTERROR("Failed to perform any change journal operations!");
+		catch (const std::exception& e) {
+			throw std::runtime_error(std::string("[ChangeJournal] Failed to reset the change journal! Caught: ") + e.what());
 		}
 
 		return success;
@@ -176,6 +180,12 @@ namespace ntfs {
 
 		auto size = ((sizeof(wchar_t) * MAX_PATH) < USN_FIELD_BY_VERSION(rec, FileNameLength) ? sizeof(wchar_t) * MAX_PATH : USN_FIELD_BY_VERSION(rec, FileNameLength));
 
+		// This may seem like an odd choice, but we find ourselves in the strange situation of having
+		// a buffer of wchar_t's in the record that is not guarenteed to be NULL terminated, and a 
+		// byte (rather than character) count, which causes bad behavior if std::wstring(buf, count) is used,
+		// or if wstring tmp = buf is used. It's probably unlikely that FileNameLength will be bigger than 
+		// MAX_PATH * sizeof(wchar_t), but in the case that it is, we truncate (since that's an exceptional case,
+		// and our fixed-sized buffer is "MAX_PATH" in length).
 		_snwprintf_s(buf, size, L"%s", USN_FIELD_BY_VERSION(rec, FileName));
 
 		ss << "{ \"Filename\" : \"" << conv.to_bytes(buf) << "\", " << "\"MajorVersion\" : " << USN_FIELD_BY_VERSION(rec, MajorVersion) << ", \"Usn\" : "

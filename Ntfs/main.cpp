@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include "..\ChangeJournal\ChangeJournal.hpp"
+#include "..\ChangeJournal\VolumeOptions.hpp"
 #include "..\Utils\ArgParser.h"
 #include <vector>
 #include <codecvt>
@@ -7,12 +8,13 @@
 #include <deque>
 #include <string>
 #include <iostream>
+#include <stdint.h>
 
 typedef enum {
 	QueryJournal = 1,
 	DeleteJournal,
 	ResetJournal = 4,
-
+	QueryMft = 8,
 } ActionList;
 
 static WCHAR* argDescriptions[] = {
@@ -40,9 +42,46 @@ static WCHAR* supportedArgs[] = {
 	L"-r",
 	L"/r",
 	L"--reset",
+	L"-m",
+	L"/m",
+	L"--mft",
 	NULL,
 };
 
+int enumerateMft(std::shared_ptr<void> volume)
+{
+	int status = ERROR_SUCCESS;
+	uint64_t recs = 0;
+
+	try {
+		ntfs::VolOps vol(volume);
+		auto total = vol.getFileCount();
+		for (recs = 0; recs < total; ++recs) {
+			vol.processMftAttributes(recs, [](ntfs::NTFS_ATTRIBUTE* attr) {
+				wchar_t buf[MAX_PATH + 1] = { 0 };
+				unsigned long size = sizeof(wchar_t) * MAX_PATH;
+
+				if (attr->AttributeType != ntfs::NtfsAttributeType::AttributeFileName) {
+					return;
+				}
+
+				auto fname = EXTRACT_ATTRIBUTE(attr, ntfs::FILENAME_ATTRIBUTE);
+				
+				size = (size < fname->NameLen) ? size : fname->NameLen;
+
+				_snwprintf_s(buf, size, L"%s", fname->Name);
+				std::wcout << L"Filename: " << buf << std::endl;
+
+			});
+		}
+	}
+	catch (const std::exception& e) {
+		std::cout << e.what() << std::endl;
+		status = ERROR_EXCEPTION_IN_RESOURCE_CALL;
+	}
+
+	return status;
+}
 
 int queryChangeJournal(std::shared_ptr<void> volume, std::string& outfile)
 {
@@ -130,6 +169,9 @@ static DWORD getActions(ArgParser& ap)
 	if (ap.getAttribute(L"d") || ap.getAttribute(L"delete"))
 		tmp |= ActionList::DeleteJournal;
 
+	if (ap.getAttribute("m") || ap.getAttribute("mft"))
+		tmp |= ActionList::QueryMft;
+
 	return tmp;
 }
 
@@ -201,5 +243,13 @@ int main(int argc, char** argv, char** envp)
 		std::wcout << L" Done." << std::endl;
 	}
 	
+	if (actionMask & ActionList::QueryMft) {
+		std::cout << "[*] Preparing to query the mft...";
+		if (ERROR_SUCCESS != (status = enumerateMft(vhandle))) {
+			std::cout << "[x] Failed to enumerate MFT!" << std::endl;
+			return status;
+		}
+	}
+
 	return status;
 }
