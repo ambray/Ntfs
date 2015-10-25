@@ -62,20 +62,26 @@ namespace ntfs {
 		void setVolHandle(std::shared_ptr<void> vh);
 
 		/**
-		* 
+		* Gets a shared pointer containing the HANDLE the class instance is currently operating on
 		*
+		* @return a shared_ptr containing the HANDLE (e.g., std::shared_ptr<void>(HANDLE, CloseHandle))
 		*/
 		std::shared_ptr<void> getVolHandle();
-		/// Volume name, filesys name, s/n, max comp. len
+
 		/**
-		* 
+		* Returns useful information about the current volume.
 		*
+		* @throws std::runtime_error if the operation fails fatally (e.g., bad handle)
+		* @return std::tuple containing (in order): the volume name, the filesystem name, 
+		*         and the max component length.
 		*/
 		std::tuple<std::string, std::string, unsigned long> getVolInfo();
 
 		/**
-		* 
+		* Gets the volume data for the current volume.
 		*
+		* @throws std::runtime_error if the operation fails to complete
+		* @return a unique_ptr containing the NTFS_VOLUME_DATA_BUFFER, and is vol_data_size bytes in size.
 		*/
 		std::unique_ptr<NTFS_VOLUME_DATA_BUFFER> getVolData();
 
@@ -101,13 +107,13 @@ namespace ntfs {
 		* 
 		*
 		*/
-		std::vector<uint8_t> processMftAttributes(uint64_t recNum, std::function<void(PNTFS_ATTRIBUTE)> func);
+		std::vector<uint8_t> processMftAttributes(uint64_t recNum, std::function<void(NTFS_ATTRIBUTE*)> func);
 
 		/**
 		* 
 		*
 		*/
-		void processMftAttributes(std::vector<uint8_t>& record, std::function<void(PNTFS_ATTRIBUTE)> func);
+		void processMftAttributes(std::vector<uint8_t>& record, std::function<void(NTFS_ATTRIBUTE*)> func);
 
 	private:
 		std::shared_ptr<void> vhandle;
