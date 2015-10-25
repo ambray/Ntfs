@@ -1,7 +1,5 @@
 #include <Windows.h>
 #include "..\ChangeJournal\ChangeJournal.hpp"
-#include "..\Utils\Buffer.h"
-#include "..\Utils\Marshaller.h"
 #include "..\Utils\ArgParser.h"
 #include <vector>
 #include <codecvt>

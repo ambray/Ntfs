@@ -75,18 +75,11 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ChangeJournal.cpp" />
-    <ClCompile Include="Journal.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="NtfsClasses.cpp" />
-    <ClCompile Include="Volume.cpp" />
     <ClCompile Include="VolumeOptions.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ChangeJournal.hpp" />
-    <ClInclude Include="Journal.h" />
-    <ClInclude Include="NtfsClasses.h" />
     <ClInclude Include="ntfs_defs.h" />
-    <ClInclude Include="Volume.h" />
     <ClInclude Include="VolumeOptions.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

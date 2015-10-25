@@ -12,13 +12,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ArgParser.h" />
-    <ClInclude Include="Buffer.h" />
-    <ClInclude Include="Marshaller.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ArgParser.cpp" />
-    <ClCompile Include="Buffer.cpp" />
-    <ClCompile Include="Marshaller.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2EF86AD9-EB28-4DE7-A5F8-3B4B2319DF23}</ProjectGuid>
