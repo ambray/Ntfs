@@ -88,11 +88,48 @@ std::vector<uint8_t> ntfs::VolOps::getMftRecord(uint64_t recNum)
 		throw VOL_API_INTERACTION_ERROR("Bad data pointer returned when querying MFT record!", ERROR_INVALID_PARAMETER);
 
 	recSize += data->BytesPerFileRecordSegment;
-	vec.resize(recSize);
+	auto tmpbuf = std::unique_ptr<NTFS_FILE_RECORD_OUTPUT_BUFFER>(reinterpret_cast<PNTFS_FILE_RECORD_OUTPUT_BUFFER>(new unsigned char[recSize]));
+
 	inBuf.FileReferenceNumber.QuadPart = recNum;
-	if (!DeviceIoControl(vhandle.get(), FSCTL_GET_NTFS_FILE_RECORD, &inBuf, sizeof(inBuf), vec.data(), vec.size(), &bytesReturned, nullptr)) {
+	if (!DeviceIoControl(vhandle.get(), FSCTL_GET_NTFS_FILE_RECORD, &inBuf, sizeof(inBuf), tmpbuf.get(), recSize, &bytesReturned, nullptr)) {
 		throw VOL_API_INTERACTION_LASTERROR("Unable to retrieve file record!");
 	}
 
+	vec.resize(tmpbuf->FileRecordLength);
+	memcpy(vec.data(), tmpbuf->FileRecordBuffer, tmpbuf->FileRecordLength);
+
 	return vec;
+}
+
+std::vector<uint8_t> ntfs::VolOps::processMftAttributes(uint64_t recNum, std::function<void(NTFS_ATTRIBUTE*)> func)
+{
+	std::vector<uint8_t> vec;
+
+	try {
+		vec = getMftRecord(recNum);
+		processMftAttributes(vec, func);
+	}
+	catch (const std::exception& e) {
+		throw std::runtime_error(std::string("[VolOps] An exception occurred while processing the requested MFT record! Error: ") + e.what());
+	}
+
+	return vec;
+}
+
+void ntfs::VolOps::processMftAttributes(std::vector<uint8_t>& record, std::function<void(NTFS_ATTRIBUTE*)> func)
+{
+	NTFS_FILE_RECORD_HEADER*		header = reinterpret_cast<NTFS_FILE_RECORD_HEADER*>(record.data());
+	NTFS_ATTRIBUTE*					current = nullptr;
+	unsigned long					frecSize = 0;
+
+	if (!record.size() || !func)
+		throw VOL_API_INTERACTION_ERROR("Unable to process MFT record! Bad parameters provided.", ERROR_INVALID_PARAMETER);
+
+	for (current = (NTFS_ATTRIBUTE*)((unsigned char*)header + header->AttributeOffset);
+		current->AttributeType != NtfsAttributeType::AttributeEndOfRecord;
+		current = (NTFS_ATTRIBUTE*)((unsigned char*)current + current->Length)) 
+	{
+		func(current);
+	}
+
 }

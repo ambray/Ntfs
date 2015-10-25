@@ -41,7 +41,8 @@ namespace ntfs {
 		AttributeEAInformation = 0xD0,
 		AttributeEA = 0xE0,
 		AttributePropertySet = 0xF0,
-		AttributeLoggedUtilityStream = 0x100
+		AttributeLoggedUtilityStream = 0x100,
+		AttributeEndOfRecord = -1
 	};
 
 	struct NTFS_RECORD_HEADER {
