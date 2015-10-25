@@ -20,13 +20,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -74,16 +74,13 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Journal.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="NtfsClasses.cpp" />
-    <ClCompile Include="Volume.cpp" />
+    <ClCompile Include="ChangeJournal.cpp" />
+    <ClCompile Include="VolumeOptions.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Journal.h" />
-    <ClInclude Include="NtfsClasses.h" />
+    <ClInclude Include="ChangeJournal.hpp" />
     <ClInclude Include="ntfs_defs.h" />
-    <ClInclude Include="Volume.h" />
+    <ClInclude Include="VolumeOptions.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

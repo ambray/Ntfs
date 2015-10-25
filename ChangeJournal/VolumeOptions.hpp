@@ -25,47 +25,43 @@
 *********************************************************************************/
 
 #include <Windows.h>
+#include <memory>
 #include <string>
-#include <iostream>
-#include <regex>
-#include <map>
-#include <codecvt>
+#include <stdint.h>
 #include <vector>
+#include <tuple>
+#include <codecvt>
 
+#define VOL_API_INTERACTION_ERROR(msg, err)\
+	std::runtime_error(("[VolOps] "  msg + std::to_string(__LINE__) + " " + std::to_string(err)))
 
-// Contains all valid help request strings.
-static WCHAR* helpOpts[] = {
-	L"-h",
-	L"--help",
-	L"/?",
-	NULL,
-};
+#define VOL_API_INTERACTION_LASTERROR(msg)\
+	VOL_API_INTERACTION_ERROR(msg, GetLastError())
 
-// Regex containing valid prefixes for command line arguments.
-static WCHAR* delimExp = L"^(--|-|/)";
+namespace ntfs {
 
-class ArgParser {
-public:
-	ArgParser(WCHAR** argv, int argc);
-	ArgParser(CHAR** argv, int argc);
-	~ArgParser();
-	bool helpRequested();
-	
-	bool getAttribute(std::wstring attrib, std::wstring& out);
-	bool getAttribute(std::wstring attrib);
+	constexpr uint32_t vol_data_size = sizeof(NTFS_VOLUME_DATA_BUFFER) + sizeof(NTFS_EXTENDED_VOLUME_DATA);
 
-	bool getAttribute(std::string attrib, std::string& out);
-	bool getAttribute(std::string attrib);
+	class VolOps {
+	public:
+		VolOps(std::shared_ptr<void> volHandle);
+		VolOps() = default;
+		~VolOps() = default;
+		VolOps(const VolOps&) = default;
+		VolOps(VolOps&&) = default;
+		VolOps& operator=(const VolOps&) = default;
+		VolOps& operator=(VolOps&&) = default;
 
-	bool stripDelims(std::wstring& arg);
-	int parseArgs(std::vector<std::wstring>& argv);
-	const std::map<std::wstring, std::wstring>& getArgs();
+		void setVolHandle(std::shared_ptr<void> vh);
+		std::shared_ptr<void> getVolHandle();
+		/// Volume name, filesys name, s/n, max comp. len
+		std::tuple<std::string, std::string, unsigned long> getVolInfo();
+		std::unique_ptr<NTFS_VOLUME_DATA_BUFFER> getVolData();
+		unsigned long getDriveType();
+		uint64_t getFileCount();
+		std::vector<uint8_t> getMftRecord(uint64_t recNum);
 
-private:
-	std::map<std::wstring, std::wstring> args;
-	bool help;
-
-	bool hasDelim(std::wstring& arg, std::wstring* storage=NULL);
-	bool isHelpOpt(std::wstring& arg);
-	bool locate(std::wstring& needle, std::wstring* out = NULL);
-};
+	private:
+		std::shared_ptr<void> vhandle;
+	};
+}
